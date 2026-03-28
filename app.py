@@ -15,8 +15,8 @@ if email_digitado not in st.secrets["usuarios_autorizados"]:
     st.warning("Acesso restrito. Por favor, identifique-se no menu lateral para liberar a esteira.")
     st.stop() # Mata a execução do site aqui. As abas nem sequer carregam.
 
-# Se passou, o código normal continua abaixo...
-st.title("❄️ Geladeira Inteligente HSM")
+# # Se passou, o código normal continua abaixo...
+# st.title("❄️ Geladeira Inteligente HSM")
 
 # Teste temporário de integridade do Cofre
 if "container_name" in st.secrets:
