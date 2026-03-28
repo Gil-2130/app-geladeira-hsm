@@ -9,21 +9,29 @@ from modulos.filtro import aprovar_campanha
 st.set_page_config(page_title="Higienizador HSM", page_icon="❄️", layout="centered")
 
 # ==========================================
-# CAMADA DE SEGURANÇA (WHITELIST)
+# CAMADA DE SEGURANÇA (WHITELIST + UX)
 # ==========================================
-email_digitado = st.sidebar.text_input("🔑 Identificação (E-mail corporativo):")
+email_digitado = st.sidebar.text_input("🔑 Identificação (E-mail corporativo):").strip().lower()
 
-# Se o e-mail não estiver na lista ou estiver vazio, bloqueia a tela.
-if email_digitado not in st.secrets["usuarios_autorizados"]:
+# Carregamos a "prancheta" de usuários do cofre (Dicionário)
+dicionario_usuarios = st.secrets["usuarios_autorizados"]
+
+# O Segurança verifica se a Chave (e-mail) existe no Dicionário
+if email_digitado not in dicionario_usuarios:
     st.title("❄️ Geladeira Inteligente HSM")
     st.warning("Acesso restrito. Por favor, identifique-se no menu lateral para liberar a esteira de higienização.")
     st.stop() # Interrompe a renderização do resto do código
+
+# Se passou, pegamos o Valor (Nome) associado àquela Chave
+nome_usuario = dicionario_usuarios[email_digitado]
 
 # ==========================================
 # APLICAÇÃO PRINCIPAL (Liberada após login)
 # ==========================================
 st.title("❄️ Geladeira Inteligente HSM")
-st.markdown(f"Bem-vindo, **{email_digitado}**. Suba a sua campanha para cortar custos com disparos inválidos.")
+
+# A Saudação Humanizada usando o nome extraído
+st.markdown(f"Bem-vindo(a), **{nome_usuario}**! Suba a sua campanha para cortar custos com disparos inválidos.")
 
 st.header("Higienizar Lista")
 st.info("Faça o upload da planilha que você deseja disparar hoje.")
