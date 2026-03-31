@@ -76,9 +76,6 @@ def limpar_memoria():
 # Inicializa a prateleira na memória, se não existir
 if 'processamento_concluido' not in st.session_state:
     st.session_state.processamento_concluido = False
-
-arquivo_campanha = st.file_uploader("Arraste a Campanha Aqui (.xlsx)", type=["xlsx"], on_change=limpar_memoria)
-
 # O componente de upload agora é bilíngue
 arquivo_campanha = st.file_uploader("Arraste a Campanha (.xlsx ou .csv)", type=["xlsx", "csv"], on_change=limpar_memoria)
 
