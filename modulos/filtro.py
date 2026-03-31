@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np # Adicionar no topo do arquivo
 from datetime import datetime
 
-def normalizar_telefone(serie_telefone):
+def normalizar_telefone(serie):
     """
     UDF de Limpeza: Remove não-números e padroniza o tamanho da string
     baseado na regra de negócio (Tamanho 13 -> 11 dir, Tamanho 12 -> 10 dir).
@@ -23,19 +23,17 @@ def normalizar_telefone(serie_telefone):
         serie_limpa.str[-10:]  # Pega os 10 da direita
     ]
     
-    # Retorna a série padronizada
-    return np.select(condicoes, escolhas, default=serie_limpa)
+    """Remove decimais '.0' e extrai apenas números limpos."""
+    return serie.astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
 
 
 def aprovar_campanha(df_campanha, df_mestra, col_tel_campanha):
-    """
-    O Fiscal da Catraca: Cruza as bases, PRESERVA as colunas originais e CARIMBA a data.
-    """
-    # 1. Normalizamos os telefones para o cruzamento sem alterar a coluna original
-    df_campanha['Chave_Join'] = df_campanha[col_tel_campanha].astype(str).str.replace(r'\D', '', regex=True)
-    df_mestra['Chave_Join'] = df_mestra['WhatsAppdoContato'].astype(str).str.replace(r'\D', '', regex=True)
+    """O Fiscal da Catraca: Cruza as bases blindando contra notação científica."""
+    # 1. Normalização Blindada
+    df_campanha['Chave_Join'] = normalizar_telefone(df_campanha[col_tel_campanha])
+    df_mestra['Chave_Join'] = normalizar_telefone(df_mestra['WhatsAppdoContato'])
     
-    # 2. O Cruzamento (LEFT JOIN). Mantém TUDO que o cliente enviou e traz apenas o Status do Cérebro
+    # 2. O Cruzamento (LEFT JOIN)
     df_resultado = pd.merge(
         df_campanha, 
         df_mestra[['Chave_Join', 'Status_Atual']], 
@@ -43,20 +41,15 @@ def aprovar_campanha(df_campanha, df_mestra, col_tel_campanha):
         how='left'
     )
     
-    # Se o cliente não estava no Cérebro, ele é novo
     df_resultado['Status_Atual'] = df_resultado['Status_Atual'].fillna('NOVO LEAD')
-    
-    # 3. O Carimbo de Data (A sua ideia brilhante para o BI)
-    # Extrai exatamente a data de hoje (ex: 2026-03-31)
     df_resultado['Data_Filtragem'] = datetime.today().strftime('%Y-%m-%d')
-    
-    # Limpamos a chave temporária
     df_resultado = df_resultado.drop(columns=['Chave_Join'])
     
-    # 4. A Separação das Portas (Verde vs Amarela)
+    # 3. ANTI-NOTAÇÃO CIENTÍFICA NO EXCEL DE SAÍDA:
+    # Força a coluna original a ser texto puro antes de exportar
+    df_resultado[col_tel_campanha] = df_resultado[col_tel_campanha].astype(str)
+    
+    # 4. Particionamento
     condicao_aprovados = df_resultado['Status_Atual'].isin(['ATIVO', 'NOVO LEAD', 'ATIVO (Repescagem Liberta)'])
     
-    df_aprovados = df_resultado[condicao_aprovados]
-    df_rejeitados = df_resultado[~condicao_aprovados]
-    
-    return df_aprovados, df_rejeitados
+    return df_resultado[condicao_aprovados], df_resultado[~condicao_aprovados]
