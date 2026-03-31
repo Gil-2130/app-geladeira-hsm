@@ -4,6 +4,8 @@ import io
 import os
 from modulos.azure_client import ler_mestra_do_azure
 from modulos.filtro import aprovar_campanha
+# Atualize a linha de importação do azure_client para incluir a nova função
+from modulos.azure_client import ler_mestra_do_azure, atualizar_historico_bi
 
 # Configuração Visual
 st.set_page_config(page_title="Higienizador HSM", page_icon="❄️", layout="wide")
@@ -100,9 +102,24 @@ if arquivo_campanha is not None:
                 # ---------------------------------------------------------
                 df_aprovados, df_rejeitados = aprovar_campanha(df_campanha, df_mestra, col_tel)
                 
-                # Enriquecimento para o futuro Azure BI
+                # Enriquecimento
                 df_aprovados['Carteira'] = nome_base
                 df_rejeitados['Carteira'] = nome_base
+                
+                # =========================================================
+                # O LIVRO-RAZÃO: Alimentando o Power BI silenciosamente
+                # =========================================================
+                colunas_bi = [col_tel, 'Status_Atual', 'Data_Filtragem', 'Carteira']
+                
+                # Criamos um DataFrame exclusivo para o BI (juntando os bons e os maus)
+                df_bi_hoje = pd.concat([
+                    df_aprovados[colunas_bi].rename(columns={col_tel: 'WhatsAppdoContato'}),
+                    df_rejeitados[colunas_bi].rename(columns={col_tel: 'WhatsAppdoContato'})
+                ], ignore_index=True)
+                
+                # Chamada para o Azure (grava em background)
+                atualizar_historico_bi(df_bi_hoje)
+                # =========================================================
                 
                 if 'Status_Atual' in df_rejeitados.columns:
                     df_leads = df_rejeitados[df_rejeitados['Status_Atual'] == 'GELADEIRA (Avaliar Comercial)']
