@@ -6,8 +6,15 @@ import numpy as np # Adicionar no topo do arquivo
 from datetime import datetime
 
 def normalizar_telefone(serie):
-    """Remove decimais '.0' e extrai apenas números limpos."""
-    return serie.astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+    """
+    Remove decimais, não-dígitos e o DDI (55) garantindo chaves universais.
+    """
+    s = serie.astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+    
+    # O Pulo do Gato (Regex Lookahead): 
+    # Se começar por '55' (^) e for seguido por exatamente 10 ou 11 números até o fim ($), remova o '55'.
+    s = s.str.replace(r'^55(?=\d{10,11}$)', '', regex=True)
+    return s
 
 def aprovar_campanha(df_campanha, df_mestra, col_tel_campanha):
     """O Fiscal da Catraca: Com a Régua de Validação de Tamanho restituída."""
