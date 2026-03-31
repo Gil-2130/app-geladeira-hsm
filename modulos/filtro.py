@@ -6,36 +6,35 @@ import numpy as np # Adicionar no topo do arquivo
 from datetime import datetime
 
 def normalizar_telefone(serie):
-    """
-    UDF de Limpeza: Remove não-números e padroniza o tamanho da string
-    baseado na regra de negócio (Tamanho 13 -> 11 dir, Tamanho 12 -> 10 dir).
-    """
-    # 1. Remove qualquer coisa que não seja número (espaços, +, -, parênteses)
-    serie_limpa = serie_telefone.astype(str).str.replace(r'\D', '', regex=True)
-    
-    # 2. Aplica a sua regra de corte (RIGHT 11 ou RIGHT 10)
-    condicoes = [
-        serie_limpa.str.len() == 13,
-        serie_limpa.str.len() == 12
-    ]
-    escolhas = [
-        serie_limpa.str[-11:], # Pega os 11 da direita
-        serie_limpa.str[-10:]  # Pega os 10 da direita
-    ]
-    
     """Remove decimais '.0' e extrai apenas números limpos."""
     return serie.astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
 
-
 def aprovar_campanha(df_campanha, df_mestra, col_tel_campanha):
-    """O Fiscal da Catraca: Cruza as bases blindando contra notação científica."""
+    """O Fiscal da Catraca: Com a Régua de Validação de Tamanho restituída."""
+    
     # 1. Normalização Blindada
     df_campanha['Chave_Join'] = normalizar_telefone(df_campanha[col_tel_campanha])
     df_mestra['Chave_Join'] = normalizar_telefone(df_mestra['WhatsAppdoContato'])
     
-    # 2. O Cruzamento (LEFT JOIN)
+    # =========================================================
+    # 2. A RÉGUA DO FISCAL (Validação Cruzada de Tamanho)
+    # Exige entre 10 e 15 dígitos (DDD + Número, com ou sem DDI 55)
+    # =========================================================
+    mascara_tamanho_valido = df_campanha['Chave_Join'].str.len().between(10, 15)
+    
+    # Separa quem passou na régua e quem reprovou (Lixo)
+    df_campanha_valida = df_campanha[mascara_tamanho_valido].copy()
+    
+    df_lixo_tamanho = df_campanha[~mascara_tamanho_valido].copy()
+    if not df_lixo_tamanho.empty:
+        df_lixo_tamanho['Status_Atual'] = 'INVÁLIDO (Erro de Digitação/Tamanho)'
+        df_lixo_tamanho['Data_Filtragem'] = datetime.today().strftime('%Y-%m-%d')
+        df_lixo_tamanho[col_tel_campanha] = df_lixo_tamanho[col_tel_campanha].astype(str)
+        df_lixo_tamanho = df_lixo_tamanho.drop(columns=['Chave_Join'])
+
+    # 3. O Cruzamento (Apenas com os números que passaram na régua)
     df_resultado = pd.merge(
-        df_campanha, 
+        df_campanha_valida, 
         df_mestra[['Chave_Join', 'Status_Atual']], 
         on='Chave_Join', 
         how='left'
@@ -45,11 +44,16 @@ def aprovar_campanha(df_campanha, df_mestra, col_tel_campanha):
     df_resultado['Data_Filtragem'] = datetime.today().strftime('%Y-%m-%d')
     df_resultado = df_resultado.drop(columns=['Chave_Join'])
     
-    # 3. ANTI-NOTAÇÃO CIENTÍFICA NO EXCEL DE SAÍDA:
-    # Força a coluna original a ser texto puro antes de exportar
     df_resultado[col_tel_campanha] = df_resultado[col_tel_campanha].astype(str)
     
     # 4. Particionamento
     condicao_aprovados = df_resultado['Status_Atual'].isin(['ATIVO', 'NOVO LEAD', 'ATIVO (Repescagem Liberta)'])
     
-    return df_resultado[condicao_aprovados], df_resultado[~condicao_aprovados]
+    df_aprovados = df_resultado[condicao_aprovados]
+    df_rejeitados = df_resultado[~condicao_aprovados]
+    
+    # 5. Reintegra os números inválidos ao montante de rejeitados (para a porta amarela)
+    if not df_lixo_tamanho.empty:
+        df_rejeitados = pd.concat([df_rejeitados, df_lixo_tamanho], ignore_index=True)
+    
+    return df_aprovados, df_rejeitados
