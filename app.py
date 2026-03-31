@@ -32,6 +32,24 @@ else:
 nome_usuario = dicionario_usuarios[email_digitado]
 
 # ==========================================
+# PAINEL DE CONTROLE (SIDEBAR)
+# ==========================================
+st.sidebar.markdown("---")
+st.sidebar.markdown("### ⚙️ Controles do Sistema")
+
+# Botão de Reboot (Limpa o Cache e a Memória)
+if st.sidebar.button("🔄 Reboot (Limpar Cache)"):
+    st.cache_data.clear()
+    st.session_state.clear()
+    st.rerun()
+
+# Botão de Logoff (Arranca o Crachá da URL)
+if st.sidebar.button("🚪 Logoff"):
+    st.query_params.clear()
+    st.session_state.clear()
+    st.rerun()
+
+# ==========================================
 # APLICAÇÃO PRINCIPAL
 # ==========================================
 st.title("❄️ Geladeira Inteligente HSM")
