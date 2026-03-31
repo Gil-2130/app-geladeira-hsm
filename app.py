@@ -42,30 +42,76 @@ if arquivo_campanha is not None:
     if st.button("Aplicar Filtro de Geladeira"):
         try:
             with st.spinner("O Carro-Forte está buscando as permissões no Azure..."):
-                # O Cérebro agora é mantido invisivelmente pelo robô local (nosso próximo passo)
                 df_mestra = ler_mestra_do_azure() 
                 df_campanha = pd.read_excel(arquivo_campanha)
                 
                 col_tel = 'WhatsAppdoContato' if 'WhatsAppdoContato' in df_campanha.columns else df_campanha.columns[0]
                 
-                # O Filtro cruza a campanha com o Cérebro Mestre
+                # A Esteira de Filtragem
                 df_aprovados, df_rejeitados = aprovar_campanha(df_campanha, df_mestra, col_tel)
                 
+                # ==========================================
+                # O ARQUIVISTA: Separação de Leads e Detratores
+                # ==========================================
+                if 'Status_Atual' in df_rejeitados.columns:
+                    # Máscara Booleana Vetorizada
+                    df_leads = df_rejeitados[df_rejeitados['Status_Atual'] == 'GELADEIRA (Avaliar Comercial)']
+                    df_puro_retidos = df_rejeitados[df_rejeitados['Status_Atual'] != 'GELADEIRA (Avaliar Comercial)']
+                else:
+                    df_leads = pd.DataFrame(columns=df_rejeitados.columns)
+                    df_puro_retidos = df_rejeitados
+                
                 st.success("Filtro Aplicado com Sucesso!")
-                col1, col2, col3 = st.columns(3)
+                
+                # PAINEL EXECUTIVO: 4 Colunas de Métricas
+                col1, col2, col3, col4 = st.columns(4)
                 col1.metric("Total Analisado", len(df_campanha))
                 col2.metric("Aprovados (Verde)", len(df_aprovados))
-                col3.metric("Retidos (Economia)", len(df_rejeitados))
+                col3.metric("Retidos (Economia)", len(df_puro_retidos))
+                col4.metric("Leads B2B (URAs)", len(df_leads))
                 
-                buffer = io.BytesIO()
-                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                # ==========================================
+                # GERAÇÃO DOS BUFFERS EM RAM
+                # ==========================================
+                
+                # Buffer 1: Aprovados (Porta Verde - Direto pro HSM)
+                buffer_aprovados = io.BytesIO()
+                with pd.ExcelWriter(buffer_aprovados, engine='xlsxwriter') as writer:
                     df_aprovados.to_excel(writer, index=False, sheet_name='Aprovados')
                 
-                st.download_button(
-                    label="⬇️ Baixar Lista Aprovada",
-                    data=buffer.getvalue(),
-                    file_name="01_Campanha_Aprovada.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                # Buffer 2: Retidos e Leads (Porta Amarela - Comercial/Auditoria)
+                buffer_retidos = io.BytesIO()
+                with pd.ExcelWriter(buffer_retidos, engine='xlsxwriter') as writer:
+                    if not df_leads.empty:
+                        df_leads.to_excel(writer, index=False, sheet_name='1_Leads_Comerciais')
+                    if not df_puro_retidos.empty:
+                        df_puro_retidos.to_excel(writer, index=False, sheet_name='2_Retidos_Economia')
+                    
+                    # Tratamento de exceção caso nenhum seja retido
+                    if df_leads.empty and df_puro_retidos.empty:
+                        pd.DataFrame({'Aviso': ['100% da base foi aprovada.']}).to_excel(writer, index=False, sheet_name='Vazio')
+
+                # ==========================================
+                # BOTÕES DE DOWNLOAD (Lado a Lado)
+                # ==========================================
+                st.markdown("### 📥 Arquivos de Saída")
+                col_btn1, col_btn2 = st.columns(2)
+                
+                with col_btn1:
+                    st.download_button(
+                        label="🚀 Baixar Aprovados (Para Disparo HSM)",
+                        data=buffer_aprovados.getvalue(),
+                        file_name="01_Campanha_Aprovada_HSM.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    
+                with col_btn2:
+                    st.download_button(
+                        label="⚠️ Baixar Leads e Retidos (Auditoria)",
+                        data=buffer_retidos.getvalue(),
+                        file_name="02_Leads_e_Retidos_Auditoria.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    
         except Exception as e:
             st.error(f"Erro de comunicação com o Cofre: {e}")
