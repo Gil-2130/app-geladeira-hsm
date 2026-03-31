@@ -9,109 +9,118 @@ from modulos.filtro import aprovar_campanha
 st.set_page_config(page_title="Higienizador HSM", page_icon="❄️", layout="centered")
 
 # ==========================================
-# CAMADA DE SEGURANÇA (WHITELIST + UX)
+# CAMADA DE SEGURANÇA (WHITELIST + QUERY PARAMS)
 # ==========================================
-email_digitado = st.sidebar.text_input("🔑 Identificação (E-mail corporativo):").strip().lower()
-
-# Carregamos a "prancheta" de usuários do cofre (Dicionário)
 dicionario_usuarios = st.secrets["usuarios_autorizados"]
 
-# O Segurança verifica se a Chave (e-mail) existe no Dicionário
+# O Recepcionista olha primeiro para a URL (Crachá)
+if "user" in st.query_params:
+    email_digitado = st.query_params["user"]
+else:
+    # Se não tiver na URL, pede para digitar
+    email_digitado = st.sidebar.text_input("🔑 Identificação (E-mail corporativo):").strip().lower()
+
+# Verifica se tem permissão
 if email_digitado not in dicionario_usuarios:
     st.title("❄️ Geladeira Inteligente HSM")
     st.warning("Acesso restrito. Por favor, identifique-se no menu lateral para liberar a esteira de higienização.")
-    st.stop() # Interrompe a renderização do resto do código
+    st.stop()
+else:
+    # Se tem permissão, pendura o crachá na URL para sobreviver ao F5
+    st.query_params["user"] = email_digitado
 
-# Se passou, pegamos o Valor (Nome) associado àquela Chave
 nome_usuario = dicionario_usuarios[email_digitado]
 
 # ==========================================
-# APLICAÇÃO PRINCIPAL (Liberada após login)
+# APLICAÇÃO PRINCIPAL
 # ==========================================
 st.title("❄️ Geladeira Inteligente HSM")
-
-# A Saudação Humanizada usando o nome extraído
 st.markdown(f"Bem-vindo(a), **{nome_usuario}**! Suba a sua campanha para cortar custos com disparos inválidos.")
 
 st.header("Higienizar Lista")
-st.info("Faça o upload da planilha que você deseja disparar hoje.")
 
-arquivo_campanha = st.file_uploader("Arraste a Campanha Aqui (.xlsx)", type=["xlsx"])
+# 1. Função que limpa a prateleira se o utilizador subir um ficheiro diferente
+def limpar_memoria():
+    st.session_state.processamento_concluido = False
+
+# Inicializa a prateleira na memória, se não existir
+if 'processamento_concluido' not in st.session_state:
+    st.session_state.processamento_concluido = False
+
+arquivo_campanha = st.file_uploader("Arraste a Campanha Aqui (.xlsx)", type=["xlsx"], on_change=limpar_memoria)
 
 if arquivo_campanha is not None:
+    # Este bloco APENAS processa e guarda na prateleira (Session State)
     if st.button("Aplicar Filtro de Geladeira"):
         try:
             with st.spinner("O Carro-Forte está buscando as permissões no Azure..."):
                 df_mestra = ler_mestra_do_azure() 
                 df_campanha = pd.read_excel(arquivo_campanha)
-                
                 col_tel = 'WhatsAppdoContato' if 'WhatsAppdoContato' in df_campanha.columns else df_campanha.columns[0]
                 
-                # A Esteira de Filtragem
                 df_aprovados, df_rejeitados = aprovar_campanha(df_campanha, df_mestra, col_tel)
                 
-                # ==========================================
-                # O ARQUIVISTA: Separação de Leads e Detratores
-                # ==========================================
                 if 'Status_Atual' in df_rejeitados.columns:
-                    # Máscara Booleana Vetorizada
                     df_leads = df_rejeitados[df_rejeitados['Status_Atual'] == 'GELADEIRA (Avaliar Comercial)']
                     df_puro_retidos = df_rejeitados[df_rejeitados['Status_Atual'] != 'GELADEIRA (Avaliar Comercial)']
                 else:
                     df_leads = pd.DataFrame(columns=df_rejeitados.columns)
                     df_puro_retidos = df_rejeitados
                 
-                st.success("Filtro Aplicado com Sucesso!")
+                # GUARDANDO TUDO NA PRATELEIRA DA MEMÓRIA
+                st.session_state.metricas = [len(df_campanha), len(df_aprovados), len(df_puro_retidos), len(df_leads)]
                 
-                # PAINEL EXECUTIVO: 4 Colunas de Métricas
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Total Analisado", len(df_campanha))
-                col2.metric("Aprovados (Verde)", len(df_aprovados))
-                col3.metric("Retidos (Economia)", len(df_puro_retidos))
-                col4.metric("Leads B2B (URAs)", len(df_leads))
-                
-                # ==========================================
-                # GERAÇÃO DOS BUFFERS EM RAM
-                # ==========================================
-                
-                # Buffer 1: Aprovados (Porta Verde - Direto pro HSM)
-                buffer_aprovados = io.BytesIO()
-                with pd.ExcelWriter(buffer_aprovados, engine='xlsxwriter') as writer:
+                # Gerando e guardando Buffer 1
+                buf_aprov = io.BytesIO()
+                with pd.ExcelWriter(buf_aprov, engine='xlsxwriter') as writer:
                     df_aprovados.to_excel(writer, index=False, sheet_name='Aprovados')
+                st.session_state.buffer_aprovados = buf_aprov.getvalue()
                 
-                # Buffer 2: Retidos e Leads (Porta Amarela - Comercial/Auditoria)
-                buffer_retidos = io.BytesIO()
-                with pd.ExcelWriter(buffer_retidos, engine='xlsxwriter') as writer:
+                # Gerando e guardando Buffer 2
+                buf_ret = io.BytesIO()
+                with pd.ExcelWriter(buf_ret, engine='xlsxwriter') as writer:
                     if not df_leads.empty:
                         df_leads.to_excel(writer, index=False, sheet_name='1_Leads_Comerciais')
                     if not df_puro_retidos.empty:
                         df_puro_retidos.to_excel(writer, index=False, sheet_name='2_Retidos_Economia')
-                    
-                    # Tratamento de exceção caso nenhum seja retido
                     if df_leads.empty and df_puro_retidos.empty:
-                        pd.DataFrame({'Aviso': ['100% da base foi aprovada.']}).to_excel(writer, index=False, sheet_name='Vazio')
-
-                # ==========================================
-                # BOTÕES DE DOWNLOAD (Lado a Lado)
-                # ==========================================
-                st.markdown("### 📥 Arquivos de Saída")
-                col_btn1, col_btn2 = st.columns(2)
+                        pd.DataFrame({'Aviso': ['100% aprovado.']}).to_excel(writer, index=False)
+                st.session_state.buffer_retidos = buf_ret.getvalue()
                 
-                with col_btn1:
-                    st.download_button(
-                        label="🚀 Baixar Aprovados (Para Disparo HSM)",
-                        data=buffer_aprovados.getvalue(),
-                        file_name="01_Campanha_Aprovada_HSM.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-                    
-                with col_btn2:
-                    st.download_button(
-                        label="⚠️ Baixar Leads e Retidos (Auditoria)",
-                        data=buffer_retidos.getvalue(),
-                        file_name="02_Leads_e_Retidos_Auditoria.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-                    
+                # Sinaliza que o trabalho está pronto!
+                st.session_state.processamento_concluido = True
+                
         except Exception as e:
             st.error(f"Erro de comunicação com o Cofre: {e}")
+
+    # ==================================================
+    # RENDERIZAÇÃO DA INTERFACE (Lê sempre da Prateleira)
+    # ==================================================
+    # Como esta parte está fora do 'if st.button', ela sobrevive ao clique de download!
+    if st.session_state.processamento_concluido:
+        st.success("Filtro Aplicado com Sucesso!")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Analisado", st.session_state.metricas[0])
+        col2.metric("Aprovados (Verde)", st.session_state.metricas[1])
+        col3.metric("Retidos (Economia)", st.session_state.metricas[2])
+        col4.metric("Leads B2B (URAs)", st.session_state.metricas[3])
+        
+        st.markdown("### 📥 Arquivos de Saída")
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            st.download_button(
+                label="🚀 Baixar Aprovados (Disparo HSM)",
+                data=st.session_state.buffer_aprovados,
+                file_name="01_Campanha_Aprovada_HSM.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            
+        with col_btn2:
+            st.download_button(
+                label="⚠️ Baixar Leads e Retidos (Auditoria)",
+                data=st.session_state.buffer_retidos,
+                file_name="02_Leads_e_Retidos_Auditoria.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
