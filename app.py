@@ -60,11 +60,11 @@ st.header("Higienizar Lista")
 # A Placa de Instruções (O Contrato de Dados UI)
 st.info("""
 **📋 Padrão de Arquivo Esperado:**
-Para garantir a qualidade dos relatórios, envie a sua planilha Excel contendo obrigatoriamente as colunas:
-1. **`WhatsAppdoContato`**: O número de telefone.
-2. **`Carteira`**: O nome da operação ou carteira responsável.
+Aceitamos planilhas no formato **Excel (.xlsx)** ou **Texto (.csv)**. O arquivo deve conter:
+1. **`WhatsAppdoContato`** (ou `VALOR_DO_REGISTRO` / `Telefone`): A coluna com os números.
+2. **`Carteira`**: O nome da operação (Opcional, mas recomendado para o BI).
 
-*Nota: Você pode incluir outras colunas (Nome, CPF, etc.). A nossa Geladeira irá preservar todas elas e devolverá o seu arquivo intacto, adicionando apenas o `Status_Atual` e a `Data_Filtragem` no final.*
+*Nota: Você pode incluir dezenas de outras colunas (Nome, CPF, etc.). A nossa Geladeira preservará absolutamente todas elas, adicionando apenas o `Status_Atual` e a `Data_Filtragem` no final da sua planilha.*
 """)
 
 # ... (o resto do seu código de upload continua aqui) ...
@@ -79,15 +79,37 @@ if 'processamento_concluido' not in st.session_state:
 
 arquivo_campanha = st.file_uploader("Arraste a Campanha Aqui (.xlsx)", type=["xlsx"], on_change=limpar_memoria)
 
+# O componente de upload agora é bilíngue
+arquivo_campanha = st.file_uploader("Arraste a Campanha (.xlsx ou .csv)", type=["xlsx", "csv"], on_change=limpar_memoria)
+
 if arquivo_campanha is not None:
-    # Este bloco APENAS processa e guarda na prateleira (Session State)
     if st.button("Aplicar Filtro de Geladeira"):
         try:
             with st.spinner("O Carro-Forte está buscando as permissões no Azure..."):
                 df_mestra = ler_mestra_do_azure() 
-                df_campanha = pd.read_excel(arquivo_campanha)
-                col_tel = 'WhatsAppdoContato' if 'WhatsAppdoContato' in df_campanha.columns else df_campanha.columns[0]
                 
+                # ---------------------------------------------------------
+                # O TRADUTOR POLIGLOTA: Motor de Inferência Delimitadora
+                # ---------------------------------------------------------
+                if arquivo_campanha.name.lower().endswith('.csv'):
+                    # Tenta primeiro o padrão Brasileiro (Ponto e Vírgula)
+                    df_campanha = pd.read_csv(arquivo_campanha, sep=';', dtype=str)
+                    
+                    # Se o Pandas achar que a tabela tem só 1 coluna gigante, 
+                    # significa que o separador era Vírgula!
+                    if len(df_campanha.columns) == 1:
+                        arquivo_campanha.seek(0) # Rebobina o "fita" do arquivo na memória RAM
+                        df_campanha = pd.read_csv(arquivo_campanha, sep=',', dtype=str)
+                else:
+                    # É Excel (.xlsx)
+                    df_campanha = pd.read_excel(arquivo_campanha, dtype=str)
+                
+                # BUSCA INTELIGENTE DA COLUNA DE TELEFONE
+                colunas_alvo = ['VALOR_DO_REGISTRO', 'WhatsAppdoContato', 'Telefone', 'Celular']
+                col_tel = next((col for col in colunas_alvo if col in df_campanha.columns), df_campanha.columns[0])
+                # ---------------------------------------------------------
+                
+                # A Esteira Continua Exatamente Igual
                 df_aprovados, df_rejeitados = aprovar_campanha(df_campanha, df_mestra, col_tel)
                 
                 if 'Status_Atual' in df_rejeitados.columns:
