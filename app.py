@@ -39,6 +39,18 @@ st.markdown(f"Bem-vindo(a), **{nome_usuario}**! Suba a sua campanha para cortar 
 
 st.header("Higienizar Lista")
 
+# A Placa de Instruções (O Contrato de Dados UI)
+st.info("""
+**📋 Padrão de Arquivo Esperado:**
+Para garantir a qualidade dos relatórios, envie a sua planilha Excel contendo obrigatoriamente as colunas:
+1. **`WhatsAppdoContato`**: O número de telefone.
+2. **`Carteira`**: O nome da operação ou carteira responsável.
+
+*Nota: Você pode incluir outras colunas (Nome, CPF, etc.). A nossa Geladeira irá preservar todas elas e devolverá o seu arquivo intacto, adicionando apenas o `Status_Atual` e a `Data_Filtragem` no final.*
+""")
+
+# ... (o resto do seu código de upload continua aqui) ...
+
 # 1. Função que limpa a prateleira se o utilizador subir um ficheiro diferente
 def limpar_memoria():
     st.session_state.processamento_concluido = False
