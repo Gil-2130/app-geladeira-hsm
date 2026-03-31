@@ -3,6 +3,7 @@
 
 import pandas as pd
 import numpy as np # Adicionar no topo do arquivo
+from datetime import datetime
 
 def normalizar_telefone(serie_telefone):
     """
@@ -26,36 +27,36 @@ def normalizar_telefone(serie_telefone):
     return np.select(condicoes, escolhas, default=serie_limpa)
 
 
-def aprovar_campanha(df_campanha, df_mestra, coluna_telefone='WhatsAppdoContato'):
+def aprovar_campanha(df_campanha, df_mestra, col_tel_campanha):
     """
-    Cruza a lista da campanha com a base mestra (OUTER APPLY).
-    Retorna dois DataFrames: Aprovados e Rejeitados.
+    O Fiscal da Catraca: Cruza as bases, PRESERVA as colunas originais e CARIMBA a data.
     """
-    # 1. Integridade: Padronização para o JOIN
-    df_campanha[coluna_telefone] = normalizar_telefone(df_campanha[coluna_telefone])
-    df_mestra['WhatsAppdoContato'] = normalizar_telefone(df_mestra['WhatsAppdoContato'])
-
-    # 2. O Cruzamento (LEFT JOIN nativo)
-    df_cruzamento = pd.merge(
+    # 1. Normalizamos os telefones para o cruzamento sem alterar a coluna original
+    df_campanha['Chave_Join'] = df_campanha[col_tel_campanha].astype(str).str.replace(r'\D', '', regex=True)
+    df_mestra['Chave_Join'] = df_mestra['WhatsAppdoContato'].astype(str).str.replace(r'\D', '', regex=True)
+    
+    # 2. O Cruzamento (LEFT JOIN). Mantém TUDO que o cliente enviou e traz apenas o Status do Cérebro
+    df_resultado = pd.merge(
         df_campanha, 
-        df_mestra[['WhatsAppdoContato', 'Status_Atual']], 
-        left_on=coluna_telefone, 
-        right_on='WhatsAppdoContato', 
+        df_mestra[['Chave_Join', 'Status_Atual']], 
+        on='Chave_Join', 
         how='left'
     )
-
-    # 3. Tratamento de Novos Leads (NULL vira NOVO LEAD)
-    df_cruzamento['Status_Atual'] = df_cruzamento['Status_Atual'].fillna('NOVO LEAD (Aprovado)')
-
-    # 4. A Peneira Lógica (Aplicando as Zonas Térmicas)
-    # Mantém quem tem 'ATIVO' ou 'NOVO LEAD' no status
-    condicao_aprovado = df_cruzamento['Status_Atual'].str.contains('ATIVO|NOVO LEAD', na=False)
-
-    df_aprovados = df_cruzamento[condicao_aprovado].copy()
-    df_rejeitados = df_cruzamento[~condicao_aprovado].copy()
-
-    # Limpeza para exportação
-    df_aprovados = df_aprovados.drop(columns=['WhatsAppdoContato_y'], errors='ignore')
-    df_rejeitados = df_rejeitados.drop(columns=['WhatsAppdoContato_y'], errors='ignore')
-
+    
+    # Se o cliente não estava no Cérebro, ele é novo
+    df_resultado['Status_Atual'] = df_resultado['Status_Atual'].fillna('NOVO LEAD')
+    
+    # 3. O Carimbo de Data (A sua ideia brilhante para o BI)
+    # Extrai exatamente a data de hoje (ex: 2026-03-31)
+    df_resultado['Data_Filtragem'] = datetime.today().strftime('%Y-%m-%d')
+    
+    # Limpamos a chave temporária
+    df_resultado = df_resultado.drop(columns=['Chave_Join'])
+    
+    # 4. A Separação das Portas (Verde vs Amarela)
+    condicao_aprovados = df_resultado['Status_Atual'].isin(['ATIVO', 'NOVO LEAD', 'ATIVO (Repescagem Liberta)'])
+    
+    df_aprovados = df_resultado[condicao_aprovados]
+    df_rejeitados = df_resultado[~condicao_aprovados]
+    
     return df_aprovados, df_rejeitados
