@@ -116,7 +116,7 @@ st.markdown("---")
 
 CUSTO_HSM = 0.40 # O valor financeiro da economia
 
-# Layout de duas colunas no topo
+# Layout de duas  no topo
 col_upload, col_resumo = st.columns([1, 1])
 
 def limpar_tela_atual():
@@ -176,6 +176,9 @@ if arquivo_campanha is not None and processar_btn:
             colunas_alvo = ['VALOR_DO_REGISTRO', 'WhatsAppdoContato', 'Telefone', 'Celular']
             col_tel = next((col for col in colunas_alvo if col in df_campanha.columns), df_campanha.columns[0])
             
+            # SNAPSHOT: Fotografa o esquema original para devolver exatamente igual
+            colunas_originais = df_campanha.columns.tolist()
+            
             # A Catraca Eletrônica
             df_aprovados, df_rejeitados = aprovar_campanha(df_campanha, df_mestra, col_tel)
             
@@ -191,10 +194,10 @@ if arquivo_campanha is not None and processar_btn:
                 df_rejeitados['Status_Atual'] = 'RETIDO'
             
             # Atualização Invisível do Azure
-            colunas_bi = [col_tel, 'Status_Atual', 'Data_Filtragem', 'Carteira']
+            _bi = [col_tel, 'Status_Atual', 'Data_Filtragem', 'Carteira']
             df_bi_hoje = pd.concat([
-                df_aprovados[colunas_bi].rename(columns={col_tel: 'WhatsAppdoContato'}),
-                df_rejeitados[colunas_bi].rename(columns={col_tel: 'WhatsAppdoContato'})
+                df_aprovados[_bi].rename(columns={col_tel: 'WhatsAppdoContato'}),
+                df_rejeitados[_bi].rename(columns={col_tel: 'WhatsAppdoContato'})
             ], ignore_index=True)
             atualizar_historico_bi(df_bi_hoje)
             
@@ -223,10 +226,12 @@ if arquivo_campanha is not None and processar_btn:
             }
             
             # Preparação de Buffers para Download...
-            colunas_sistema = ['Status_Atual', 'Data_Filtragem', 'Carteira']
-            df_aprovados_cliente = df_aprovados.drop(columns=[c for c in colunas_sistema if c in df_aprovados.columns])
+            # O Filtro Absoluto: Devolve apenas as colunas que vieram no arquivo original
+            colunas_para_devolver = [c for c in colunas_originais if c in df_aprovados.columns]
+            df_aprovados_cliente = df_aprovados[colunas_para_devolver]
             
             buf_aprov = io.BytesIO()
+            
             if extensao == 'csv':
                 df_aprovados_cliente.to_csv(buf_aprov, sep=';', index=False, encoding='utf-8-sig')
                 st.session_state.mime_aprov, st.session_state.nome_arq_aprov = "text/csv", f"{nome_base}_Aprovados.csv"
