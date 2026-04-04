@@ -259,6 +259,101 @@ if arquivo_campanha is not None and processar_btn:
     except Exception as e:
         st.error(f"Erro na operação: {e}")
 
+# # ==================================================
+# # A VITRINE EXECUTIVA (Renderização Gráfica em Grid)
+# # ==================================================
+# if st.session_state.processamento_concluido:
+#     nome_atual = st.session_state.nome_arquivo_atual
+#     dados_atuais = st.session_state.historico_diario[nome_atual]
+    
+#     st.markdown("---") # Linha horizontal divisória
+#     st.markdown(f"## 📊 Análise da Campanha: `{nome_atual}`")
+    
+#     # 1. Painel de ROI da Campanha Atual (Em Cartões)
+#     c1, c2, c3, c4 = st.columns(4)
+#     with c1:
+#         with st.container(border=True):
+#             st.metric("Analisados", dados_atuais['Total'])
+#     with c2:
+#         with st.container(border=True):
+#             st.metric("Aprovados (Disparo)", dados_atuais['Aprovados'])
+#     with c3:
+#         with st.container(border=True):
+#             st.metric("Bloqueios Táticos", dados_atuais['Retidos_Totais'])
+#     with c4:
+#         with st.container(border=True):
+#             st.metric("Economia Gerada (R$)", f"R$ {dados_atuais['Economia']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    
+#     # 2. A Matriz de 3 Colunas com Fronteiras Individuais
+#     col_donut_atual, col_donut_acumulado, col_acoes = st.columns([1, 1, 1])
+    
+#     # --- COLUNA 1: Donut Atual ---
+#     with col_donut_atual:
+#         with st.container(border=True):
+#             labels = ['Aprovados (Verdes)', 'Economia (Geladeira/Freezer)', 'URAs (Leads Comerciais)']
+#             valores_atual = [dados_atuais['Aprovados'], dados_atuais['Retidos'], dados_atuais['URAs']]
+#             cores = ['#2ECC71', '#E74C3C', '#F1C40F']
+            
+#             fig_atual = px.pie(values=valores_atual, names=labels, hole=0.5, color=labels, color_discrete_map={l: c for l, c in zip(labels, cores)})
+#             fig_atual.update_layout(title_text="Saúde da Campanha (Lote Atual)", margin=dict(t=40, b=0, l=0, r=0), height=280)
+#             st.plotly_chart(fig_atual, width="stretch")
+
+#     # --- COLUNA 2: Donut Acumulado do Dia ---
+#     with col_donut_acumulado:
+#         with st.container(border=True):
+#             tot_aprov = sum(d['Aprovados'] for d in st.session_state.historico_diario.values())
+#             tot_retid = sum(d['Retidos'] for d in st.session_state.historico_diario.values())
+#             tot_uras  = sum(d['URAs'] for d in st.session_state.historico_diario.values())
+            
+#             valores_acumulados = [tot_aprov, tot_retid, tot_uras]
+            
+#             fig_acumulado = px.pie(values=valores_acumulados, names=labels, hole=0.5, color=labels, color_discrete_map={l: c for l, c in zip(labels, cores)})
+#             fig_acumulado.update_layout(title_text="Saúde Diária (Acumulado Geral)", margin=dict(t=40, b=0, l=0, r=0), height=280)
+#             st.plotly_chart(fig_acumulado, width="stretch")
+
+#     # --- COLUNA 3: Centro de Comando (Botões + Auditoria) ---
+#     with col_acoes:
+#         with st.container(border=True):
+#             st.markdown("<br>", unsafe_allow_html=True)
+#             st.success("✅ **Esteira Concluída. Arquivos Prontos.**")
+#             st.download_button("🚀 Baixar Aprovados (Disparo HSM)", data=st.session_state.buffer_aprovados, file_name=st.session_state.nome_arq_aprov, mime=st.session_state.mime_aprov, width="stretch")
+#             st.download_button("⚠️ Baixar Base Rejeitada (Auditoria)", data=st.session_state.buffer_retidos, file_name=st.session_state.nome_arq_ret, mime=st.session_state.mime_ret, width="stretch")
+            
+#             st.markdown("<br>", unsafe_allow_html=True)
+#             if not st.session_state.df_auditoria.empty:
+#                 with st.expander("🔍 Auditoria Dinâmica (Top 50 Bloqueios)"):
+#                     colunas_ver = ['WhatsAppdoContato', 'Status_Atual'] if 'Status_Atual' in st.session_state.df_auditoria.columns else st.session_state.df_auditoria.columns
+#                     st.dataframe(st.session_state.df_auditoria[colunas_ver], width='stretch')
+
+# # ==================================================
+# # A TABELA DO LIVRO-RAZÃO DIÁRIO COM LINHA DE TOTAL
+# # ==================================================
+# if st.session_state.historico_diario:
+#     st.markdown("---")
+#     st.markdown("### 📋 Histórico de Processamento da Sessão")
+#     df_historico = pd.DataFrame.from_dict(st.session_state.historico_diario, orient='index')
+#     df_historico.index.name = 'Campanha_Processada'
+#     df_historico = df_historico.reset_index()
+    
+#     # 1. Cálculos da Linha de Totais
+#     total_linha = pd.DataFrame({
+#         'Campanha_Processada': ['TOTAL ACUMULADO'],
+#         'Total': [df_historico['Total'].sum()],
+#         'Aprovados': [df_historico['Aprovados'].sum()],
+#         'Retidos': [df_historico['Retidos'].sum()],
+#         'URAs': [df_historico['URAs'].sum()],
+#         'Retidos_Totais': [df_historico['Retidos_Totais'].sum()],
+#         'Economia': [df_historico['Economia'].sum()]
+#     })
+    
+#     # 2. Concatena a linha de totais ao fundo da tabela
+#     df_historico_com_total = pd.concat([df_historico, total_linha], ignore_index=True)
+    
+#     # 3. Formatação visual da moeda na tabela
+#     df_historico_com_total['Economia'] = df_historico_com_total['Economia'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+    
+#     # 4. Renderização
+#     st.dataframe(df_historico_com_total, width='stretch')
 # ==================================================
 # A VITRINE EXECUTIVA (Renderização Gráfica em Grid)
 # ==================================================
@@ -266,10 +361,25 @@ if st.session_state.processamento_concluido:
     nome_atual = st.session_state.nome_arquivo_atual
     dados_atuais = st.session_state.historico_diario[nome_atual]
     
-    st.markdown("---") # Linha horizontal divisória
+    st.markdown("---") 
     st.markdown(f"## 📊 Análise da Campanha: `{nome_atual}`")
     
+    # ==================================================
+    # NOVA BARRA DE AÇÕES (Downloads colados no Upload)
+    # ==================================================
+    st.success("✅ **Esteira Concluída. Arquivos higienizados prontos para uso:**")
+    col_btn1, col_btn2 = st.columns(2)
+    
+    with col_btn1:
+        st.download_button("🚀 Baixar Aprovados (Disparo HSM)", data=st.session_state.buffer_aprovados, file_name=st.session_state.nome_arq_aprov, mime=st.session_state.mime_aprov, width="stretch")
+    with col_btn2:
+        st.download_button("⚠️ Baixar Base Rejeitada (Auditoria)", data=st.session_state.buffer_retidos, file_name=st.session_state.nome_arq_ret, mime=st.session_state.mime_ret, width="stretch")
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # ==================================================
     # 1. Painel de ROI da Campanha Atual (Em Cartões)
+    # ==================================================
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         with st.container(border=True):
@@ -284,18 +394,21 @@ if st.session_state.processamento_concluido:
         with st.container(border=True):
             st.metric("Economia Gerada (R$)", f"R$ {dados_atuais['Economia']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
-    # 2. A Matriz de 3 Colunas com Fronteiras Individuais
-    col_donut_atual, col_donut_acumulado, col_acoes = st.columns([1, 1, 1])
+    # ==================================================
+    # 2. A Matriz Gráfica (Agora com 2 colunas largas)
+    # ==================================================
+    col_donut_atual, col_donut_acumulado = st.columns([1, 1])
+    
+    labels = ['Aprovados (Verdes)', 'Economia (Geladeira/Freezer)', 'URAs (Leads Comerciais)']
+    cores = ['#2ECC71', '#E74C3C', '#F1C40F']
     
     # --- COLUNA 1: Donut Atual ---
     with col_donut_atual:
         with st.container(border=True):
-            labels = ['Aprovados (Verdes)', 'Economia (Geladeira/Freezer)', 'URAs (Leads Comerciais)']
             valores_atual = [dados_atuais['Aprovados'], dados_atuais['Retidos'], dados_atuais['URAs']]
-            cores = ['#2ECC71', '#E74C3C', '#F1C40F']
             
             fig_atual = px.pie(values=valores_atual, names=labels, hole=0.5, color=labels, color_discrete_map={l: c for l, c in zip(labels, cores)})
-            fig_atual.update_layout(title_text="Saúde da Campanha (Lote Atual)", margin=dict(t=40, b=0, l=0, r=0), height=280)
+            fig_atual.update_layout(title_text="Saúde da Campanha (Lote Atual)", margin=dict(t=40, b=0, l=0, r=0), height=300)
             st.plotly_chart(fig_atual, width="stretch")
 
     # --- COLUNA 2: Donut Acumulado do Dia ---
@@ -304,26 +417,20 @@ if st.session_state.processamento_concluido:
             tot_aprov = sum(d['Aprovados'] for d in st.session_state.historico_diario.values())
             tot_retid = sum(d['Retidos'] for d in st.session_state.historico_diario.values())
             tot_uras  = sum(d['URAs'] for d in st.session_state.historico_diario.values())
-            
             valores_acumulados = [tot_aprov, tot_retid, tot_uras]
             
             fig_acumulado = px.pie(values=valores_acumulados, names=labels, hole=0.5, color=labels, color_discrete_map={l: c for l, c in zip(labels, cores)})
-            fig_acumulado.update_layout(title_text="Saúde Diária (Acumulado Geral)", margin=dict(t=40, b=0, l=0, r=0), height=280)
+            fig_acumulado.update_layout(title_text="Saúde Diária (Acumulado Geral)", margin=dict(t=40, b=0, l=0, r=0), height=300)
             st.plotly_chart(fig_acumulado, width="stretch")
 
-    # --- COLUNA 3: Centro de Comando (Botões + Auditoria) ---
-    with col_acoes:
-        with st.container(border=True):
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.success("✅ **Esteira Concluída. Arquivos Prontos.**")
-            st.download_button("🚀 Baixar Aprovados (Disparo HSM)", data=st.session_state.buffer_aprovados, file_name=st.session_state.nome_arq_aprov, mime=st.session_state.mime_aprov, width="stretch")
-            st.download_button("⚠️ Baixar Base Rejeitada (Auditoria)", data=st.session_state.buffer_retidos, file_name=st.session_state.nome_arq_ret, mime=st.session_state.mime_ret, width="stretch")
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            if not st.session_state.df_auditoria.empty:
-                with st.expander("🔍 Auditoria Dinâmica (Top 50 Bloqueios)"):
-                    colunas_ver = ['WhatsAppdoContato', 'Status_Atual'] if 'Status_Atual' in st.session_state.df_auditoria.columns else st.session_state.df_auditoria.columns
-                    st.dataframe(st.session_state.df_auditoria[colunas_ver], width='stretch')
+    # ==================================================
+    # 3. Auditoria Dinâmica (Full Width abaixo dos gráficos)
+    # ==================================================
+    if not st.session_state.df_auditoria.empty:
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander("🔍 Auditoria Dinâmica (Amostra de 50 Bloqueios)"):
+            colunas_ver = ['WhatsAppdoContato', 'Status_Atual'] if 'Status_Atual' in st.session_state.df_auditoria.columns else st.session_state.df_auditoria.columns
+            st.dataframe(st.session_state.df_auditoria[colunas_ver], width="stretch")
 
 # ==================================================
 # A TABELA DO LIVRO-RAZÃO DIÁRIO COM LINHA DE TOTAL
@@ -335,7 +442,6 @@ if st.session_state.historico_diario:
     df_historico.index.name = 'Campanha_Processada'
     df_historico = df_historico.reset_index()
     
-    # 1. Cálculos da Linha de Totais
     total_linha = pd.DataFrame({
         'Campanha_Processada': ['TOTAL ACUMULADO'],
         'Total': [df_historico['Total'].sum()],
@@ -346,11 +452,7 @@ if st.session_state.historico_diario:
         'Economia': [df_historico['Economia'].sum()]
     })
     
-    # 2. Concatena a linha de totais ao fundo da tabela
     df_historico_com_total = pd.concat([df_historico, total_linha], ignore_index=True)
-    
-    # 3. Formatação visual da moeda na tabela
     df_historico_com_total['Economia'] = df_historico_com_total['Economia'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
     
-    # 4. Renderização
-    st.dataframe(df_historico_com_total, width='stretch')
+    st.dataframe(df_historico_com_total, width="stretch")
