@@ -250,7 +250,7 @@ if arquivo_campanha is not None and processar_btn:
             
             # Salvamos a auditoria das top 50 recusas
             st.session_state.df_auditoria = df_rejeitados.head(50) if not df_rejeitados.empty else pd.DataFrame()
-            st.session_state.nome_arquivo_atual = nome_base
+            st.session_state.nome_arquivo_atual = chave_sessao_unica # <--- PONTEIRO CORRIGIDO
             st.session_state.processamento_concluido = True
             
             st.balloons() # O toque Premium de UX!
